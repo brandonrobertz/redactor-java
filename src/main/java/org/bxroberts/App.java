@@ -32,42 +32,42 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.*;
 
-/**
- * Hello world!
- *
- */
-/*
-public class App
-{
-    public static void main( String[] args )
-    {
-        System.out.println( "Hello World!" );
-    }
-}
-*/
 
 
 /**
- * This is an example on how to remove text from PDF document.
+ * Redact areas of a PDF based on regex matches.
  *
- * Note:
- * ------------
- * Because of nature of the PDF structure itself, actually this will not work 100% able to find text that need to be replaced.
- * There are other solutions for that, for example using PDFTextStripper.
+ * NOTE: This doesn't remove the actual text, just places a bounding box over the text.
  *
- * @author Christian H <chadilukito@gmail.com>
- *
- * Source: https://github.com/chadilukito/Apache-PdfBox-2-Examples/blob/master/ReplaceText.java
+ * Super inspiration: https://stackoverflow.com/questions/32978179/using-pdfbox-to-get-location-of-line-of-text
+ * Inspiration: https://github.com/chadilukito/Apache-PdfBox-2-Examples/blob/master/ReplaceText.java
  */
 public final class App
 {
     /**
+     * Regexes to match and place a bounding box over.
+     */
+    public static final String[] regexes = {
+        // email
+        "[a-zA-Z0-9.]+@[a-zA-Z0-9.]+",
+        // phone 0300 918 8111
+        "\\d+\\s\\d+\\s\\d+\\s\\d*\\s*\\d*\\s*",
+        // advanced email
+        "[a-z0-9!#$%&'*+\\/=?^_`{|.}~-]+@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?",
+        // phone
+        "((?:(?<![[0-9]-])(?:\\+?[0-9]{1,3}[-.\\s*]?)?(?:\\(?[0-9]{3}\\)?[-.\\s*]?)?[0-9]{3}[-.\\s*]?[0-9]{4}(?![[0-9]-]))|(?:(?<![[0-9]-])(?:(?:\\(\\+?[0-9]{2}\\))|(?:\\+?[0-9]{2}))\\s*[0-9]{2}\\s*[0-9]{3}\\s*[0-9]{4}(?![[0-9]-])))",
+        // BITCOIN_ADDRESS
+        "(?<![a-km-zA-HJ-NP-Z0-9])[13][a-km-zA-HJ-NP-Z0-9]{26,33}(?![a-km-zA-HJ-NP-Z0-9])",
+        // CREDIT_CARD
+        "((?:(?:[0-9]{4}[- ]?){3}[0-9]{4}|[0-9]{15,16}))(?![[0-9]])",
+        // SOCIAL_SECURITY_NUMBER
+        "(?!000|666|333)0*(?:[0-6][0-9][0-9]|[0-7][0-6][0-9]|[0-7][0-7][0-2])[- ](?!00)[0-9]{2}[- ](?!0000)[0-9]{4}",
+    };
+
+    /**
      * Default constructor.
      */
-    private App()
-    {
-        //example class should not be instantiated
-    }
+    private App() {}
 
     /**
      * This will remove all text from a PDF document.
@@ -78,241 +78,169 @@ public final class App
      */
     public static void main( String[] args ) throws IOException
     {
-	    if( args.length != 3 )
-	    {
-		    usage();
-		    System.exit(1);
-	    }
+        if( args.length != 3 )
+        {
+            usage();
+            System.exit(1);
+        }
 
-	    String searchString = args[0];
-	    String replacement = "****";
+        String searchString = args[0];
+        String replacement = "";
 
-            String infile = args[1];
-            String outfile = args[2];
+        String infile = args[1];
+        String outfile = args[2];
 
-            // for (int i = 0; i < searchString.length(); i++) {
-            //         replacement += "*";
-            // }
+        for (int i = 0; i < searchString.length(); i++)
+        {
+            replacement += "*";
+        }
 
-	    PDDocument document = null;
-	    try
-	    {
-		    document = PDDocument.load( new File(infile) );
-		    if( document.isEncrypted() )
-		    {
-			    System.err.println( "Error: Encrypted documents are not supported for this example." );
-			    System.exit(1);
-		    }
+        PDDocument document = null;
+        try
+        {
+            document = PDDocument.load( new File(infile) );
+            if( document.isEncrypted() )
+            {
+                System.err.println( "Error: Encrypted documents are not supported for this example." );
+                System.exit(1);
+            }
 
-		    System.out.println(searchString + " => "+ replacement);
+            System.out.println(searchString + " => "+ replacement);
 
-		    document = _ReplaceText(document, searchString, replacement);
-		    document.save(outfile);
-	    }
-	    finally
-	    {
-		    if( document != null )
-		    {
-			    document.close();
-		    }
-	    }
+            document = _ReplaceText(document, searchString, replacement);
+            document.save(outfile);
+        }
+        finally
+        {
+            if( document != null )
+            {
+                document.close();
+            }
+        }
     }
 
-    private static void drawRect(PDPageContentStream content, Rectangle rect, Color color, boolean fill) throws IOException {
-            //Setting the non stroking color
-            content.setNonStrokingColor(Color.DARK_GRAY);
-            //Drawing a rectangle 
-            // Rectangle rect = new Rectangle(startX, startY, width, height);
-            // Rectangle rect = new Rectangle(200, 650, 100, 100);
-            // content.addRect(200, 650, 100, 100);
-            content.addRect(rect.x, rect.y, rect.width, rect.height);
-            //Drawing a rectangle
-            content.fill();
+    private static void drawRect(PDPageContentStream content, Rectangle rect, Color color, boolean fill) throws IOException
+    {
+        //Setting the non stroking color
+        content.setNonStrokingColor(Color.DARK_GRAY);
+        //Drawing a rectangle 
+        // Rectangle rect = new Rectangle(startX, startY, width, height);
+        // Rectangle rect = new Rectangle(200, 650, 100, 100);
+        // content.addRect(200, 650, 100, 100);
+        content.addRect(rect.x, rect.y, rect.width, rect.height);
+        //Drawing a rectangle
+        content.fill();
     }
 
     private static PDDocument _ReplaceText(PDDocument document, String searchString, String replacement) throws IOException
     {
-        if (StringUtils.isEmpty(searchString) || StringUtils.isEmpty(replacement)) {
+        if (StringUtils.isEmpty(searchString) || StringUtils.isEmpty(replacement))
+        {
             return document;
         }
 
         int pageNumber = -1;
         for ( PDPage page : document.getPages() )
         {
-                pageNumber++;
+            pageNumber++;
 
-                final List<Rectangle> redactionRects = new ArrayList<Rectangle>();
-                PDFTextStripper stripper = new PDFTextStripper()
+            final List<Rectangle> redactionRects = new ArrayList<Rectangle>();
+            PDFTextStripper stripper = new PDFTextStripper()
+            {
+                @Override
+                protected void writeString(String text, List<TextPosition> textPositions) throws IOException
                 {
-                        @Override
-                        protected void startPage(PDPage page) throws IOException
-                        {
-                                startOfLine = true;
-                                super.startPage(page);
-                        }
-                        @Override
-                        protected void writeLineSeparator() throws IOException
-                        {
-                                startOfLine = true;
-                                super.writeLineSeparator();
-                        }
-
-                        @Override
-                        protected void writeString(String text, List<TextPosition> textPositions) throws IOException
-                        {
-                                String textString = "";
-                                for(TextPosition t: textPositions) {
-                                        textString += t.toString();
-                                }
-                                // System.out.println("textString: " + textString);
-
-                                String[] regexes = {
-                                        // email
-                                        "[a-zA-Z0-9.]+@[a-zA-Z0-9.]+",
-                                        // phone
-                                        "\\d+\\s\\d+\\s\\d+\\s\\d*\\s*\\d*\\s*"
-                                };
-
-                                // find matches in this line, this is just in the text
-                                // we're going to add them to matches, then later use the
-                                // match strings to find the token streams and get the
-                                // bounding box
-                                List<String> matches = new ArrayList<String>();
-                                for(String re: regexes) {
-                                        Matcher m = Pattern.compile(re).matcher(textString);
-                                        while(m.find()) {
-                                                String match = m.group(0);
-                                                System.out.println("MATCH: " + match);
-                                                matches.add(match);
-                                        }
-                                }
-
-                                for(String match: matches) {
-                                        int startIndex = 0;
-                                        int matchStartIndex  = -1;
-                                        int matchEndIndex = -1;
-                                        while ((matchStartIndex = textString.indexOf(match, startIndex)) > -1) {
-                                                // TODO: get index of match start and end
-                                                matchEndIndex = matchStartIndex + match.length();
-                                                System.out.println("matchEndIndex: " + matchEndIndex + " matchStartIndex: " + matchStartIndex);
-                                                // TODO: get token of match start
-                                                TextPosition startToken = textPositions.get(matchStartIndex);
-                                                // TODO: get last token
-                                                TextPosition endToken = textPositions.get(matchEndIndex - 1);
-                                                // TODO: compute bounding box
-                                                // Rectangle rect = new Rectangle(startX, startY, width, height);
-                                                // content.addRect(rect.x, rect.y, rect.width, rect.height);
-                                                float width = endToken.getX() - startToken.getX();
-                                                float height = startToken.getHeightDir();
-                                                float scaleDiff = (height * scaleHeight) - height;
-                                                Rectangle rect = new Rectangle(
-                                                        (int)Math.ceil(startToken.getX()),
-                                                        (int)Math.ceil(startToken.getY() - (scaleDiff / 2.0f)), 
-                                                        (int)Math.ceil(width * scaleWidth),
-                                                        (int)Math.ceil(height * scaleHeight)
-                                                );
-                                                System.out.println("Rect: " + rect.toString());
-
-                                                System.out.println("Page: " + super.getCurrentPageNo());
-
-                                                redactionRects.add(rect);
-
-                                                // writeString("[x: " + fp.getXDirAdj() + ", y: "
-                                                //         + fp.getY() + ", height:" + fp.getHeightDir()
-                                                //         + ", space: " + fp.getWidthOfSpace() + ", width: "
-                                                //         + fp.getWidthDirAdj() + ", yScale: " + fp.getYScale() + "]");
-
-
-                                                // TODO: add to redaction areas list
-                                                startIndex = matchEndIndex + 1;
-                                        }
-                                }
-
-                                if (startOfLine)
-                                {
-                                        // first position
-                                        TextPosition fp = textPositions.get(0);
-                                        // // writeString(String.format("[%s]", fp.getXDirAdj()));
-                                        // writeString("[x: " + fp.getXDirAdj() + ", y: "
-                                        //         + fp.getY() + ", height:" + fp.getHeightDir()
-                                        //         + ", space: " + fp.getWidthOfSpace() + ", width: "
-                                        //         + fp.getWidthDirAdj() + ", yScale: " + fp.getYScale() + "]");
-                                        startOfLine = false;
-                                }
-                                super.writeString(text, textPositions);
-                        }
-
-                        // @Override
-                        // protected void processTextPosition(TextPosition text) {
-                        //         String c = text.toString();
-                        //         if (word.isEmpty()) {
-                        //                 startOfWord = text;
-                        //         }
-                        //         if (c.equals(super.getWordSeparator())) {
-                        //                 System.out.println("WORD: " + word);
-                        //                 endOfWord = text;
-                        //                 wordTokens.clear();
-                        //                 word = "";
-                        //         } else {
-                        //                 word += c;
-                        //                 System.out.println("String[" + text.getXDirAdj() + ","
-                        //                                 + text.getYDirAdj() + " fs=" + text.getFontSize() + " xscale="
-                        //                                 + text.getXScale() + " height=" + text.getHeightDir() + " space="
-                        //                                 + text.getWidthOfSpace() + " width="
-                        //                                 + text.getWidthDirAdj() + "]" + c);
-                        //                 wordTokens.add(text);
-                        //         }
-                        //         super.processTextPosition(text);
-                        // }
-                        // scale the height and width by this percent
-                        float scaleWidth = 1.10f;
-                        // height is particular bad, we need to make sure this really covers the area
-                        float scaleHeight = 1.75f;
-                        boolean startOfLine = true;
-                        TextPosition startOfWord;
-                        TextPosition endOfWord;
-                        String word = "";
-                        List<TextPosition> wordTokens = new ArrayList<TextPosition>();
-                };
-        
-                // page number is 1 indexed I guess?
-                stripper.setStartPage(pageNumber+1);
-                stripper.setEndPage(pageNumber+1);
-                System.out.println("Getting rects for page: " + pageNumber);
-                stripper.getText(document);
-                System.out.println("Total redaction rects: " + redactionRects.size());
-                // System.out.println("STRIPPED\n" + stripper.getText(document));
-
-                PDPageContentStream content = new PDPageContentStream(document, page, true, true);
-                for(Rectangle rect: redactionRects) {
-                        System.out.println("Redacting rect: " + rect.toString());
-                        rect.y = (int)page.getMediaBox().getHeight() - rect.y;
-                        drawRect(content, rect, Color.BLACK, true);
-                }
-                System.out.println("Page " + pageNumber + " done.");
-
-                content.close();
-
-            /*
-            PDFTextStripperByArea stripper = new PDFTextStripperByArea();
-            stripper.setSortByPosition(true);
-            stripper.extractRegions(page);
-            // Get the characters and their locations
-            String searchedChar = "a";
-            List<List<TextPosition>> vectorlistoftps = stripper.getCharactersByArticle();
-            for (int ii = 0; ii < vectorlistoftps.size(); ii++) {
-                    List<TextPosition> tplist = vectorlistoftps.get(ii);
-                    for (int jj = 0; jj < tplist.size(); jj++) {
-                            TextPosition text = tplist.get(jj);
-                            System.out.println(" String "
-                                            + "[x: " + text.getXDirAdj() + ", y: "
-                                            + text.getY() + ", height:" + text.getHeightDir()
-                                            + ", space: " + text.getWidthOfSpace() + ", width: "
-                                            + text.getWidthDirAdj() + ", yScale: " + text.getYScale() + "]");
+                    String textString = "";
+                    for(TextPosition t: textPositions) {
+                        String chr = t.toString();
+                        if (chr.length() < 1) chr = " ";
+                        textString += chr;
                     }
-            }
-            */
 
+                    // find matches in this line, this is just in the text
+                    // we're going to add them to matches, then later use the
+                    // match strings to find the token streams and get the
+                    // bounding box
+                    List<String> matches = new ArrayList<String>();
+                    for(String re: regexes) {
+                        Matcher m = Pattern.compile(re).matcher(textString);
+                        while(m.find()) {
+                            String match = m.group(0);
+                            System.out.println("MATCH: " + match);
+                            matches.add(match);
+                        }
+                    }
+
+                    // minimum height of a redaction
+                    float minRedactHeight = 7.0f;
+                    for(String match: matches) {
+                        int startIndex = 0;
+                        int matchStartIndex  = -1;
+                        int matchEndIndex = -1;
+                        while ((matchStartIndex = textString.indexOf(match, startIndex)) > -1)
+                        {
+                            // get index of match start and end
+                            matchEndIndex = matchStartIndex + match.length();
+                            matchEndIndex = (matchEndIndex > textPositions.size()) ? textPositions.size() : matchEndIndex;
+                            System.out.println("textString: " + textString
+                                    + " length: " + textString.length());
+                            System.out.println(" match: " + match
+                                    + " matchEndIndex: " + matchEndIndex
+                                    + " matchStartIndex: " + matchStartIndex);
+                            // get token of match start
+                            TextPosition startToken = textPositions.get(matchStartIndex);
+                            // get last token
+                            TextPosition endToken = textPositions.get(matchEndIndex - 1);
+                            // compute bounding box
+                            float width = endToken.getX() - startToken.getX();
+                            float height = startToken.getHeightDir();
+                            height = (height < minRedactHeight) ? minRedactHeight : height;
+                            float scaleDiff = Math.abs((height * scaleHeight) - height);
+                            Rectangle rect = new Rectangle(
+                                (int)Math.ceil(startToken.getX()),
+                                // make sure we cover the bottoms of the chars, shift
+                                // down a little bit to do so (positive moves down on page here)
+                                (int)Math.ceil(startToken.getY() + (scaleDiff * 0.25)), 
+                                (int)Math.ceil(width * scaleWidth),
+                                (int)Math.ceil(height * scaleHeight)
+                            );
+
+                            System.out.println("Rect: " + rect.toString());
+                            System.out.println("Page: " + super.getCurrentPageNo());
+
+                            redactionRects.add(rect);
+                            startIndex = matchEndIndex;
+                        }
+                    }
+                    super.writeString(text, textPositions);
+                }
+
+                // scale the height and width by this percent
+                float scaleWidth = 1.25f;
+                // height is particular bad, we need to make sure this really covers the area
+                float scaleHeight = 2.0f;
+            };
+
+            // page number is 1 indexed I guess?
+            stripper.setStartPage(pageNumber+1);
+            stripper.setEndPage(pageNumber+1);
+            System.out.println("Getting rects for page: " + pageNumber);
+            stripper.getText(document);
+            System.out.println("Total redaction rects: " + redactionRects.size());
+
+            // Actually draw the rects
+            PDPageContentStream content = new PDPageContentStream(document, page, true, true);
+            for(Rectangle rect: redactionRects) {
+                System.out.println("Redacting rect: " + rect.toString());
+                rect.y = (int)page.getMediaBox().getHeight() - rect.y;
+                drawRect(content, rect, Color.BLACK, true);
+            }
+            System.out.println("Page " + pageNumber + " done.");
+            content.close();
+
+            /**
+             * NOTE: The rest of this doesn't really work on most PDFs.
+             */
             PDFStreamParser parser = new PDFStreamParser(page);
             parser.parse();
             List tokens = parser.getTokens();
@@ -334,12 +262,12 @@ public final class App
                         COSString previous = (COSString) tokens.get(j - 1);
                         String string = previous.getString();
                         if (string.equals(searchString)) {
-                                System.out.println("MATCH");
+                            System.out.println("MATCH");
                         }
                         string = string.replaceFirst(searchString, replacement);
                         previous.setValue(string.getBytes());
                     }
-		    else if (op.getName().equals("TJ"))
+                    else if (op.getName().equals("TJ"))
                     {
                         COSArray previous = (COSArray) tokens.get(j - 1);
                         for (int k = 0; k < previous.size(); k++)
@@ -365,7 +293,8 @@ public final class App
                             COSString cosString2 = (COSString) previous.getObject(0);
                             cosString2.setValue(replacement.getBytes());
                             int total = previous.size()-1;
-                            for (int k = total; k > 0; k--) {
+                            for (int k = total; k > 0; k--)
+                            {
                                 previous.remove(k);
                             }
                         }
